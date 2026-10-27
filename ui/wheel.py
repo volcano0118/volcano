@@ -16,9 +16,9 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-SIZE = 300
-R_OUT = 148.0
-R_IN = 104.0
+SIZE = 250
+R_OUT = 120.0
+R_IN = 82.0
 GAP_DEG = 3.0
 
 ACTIONS = ("吃饭", "睡觉", "挥手", "喝水")
@@ -157,7 +157,7 @@ class ActionWheel(QWidget):
             painter.setBrush(FILL_HOVER if index == self._hover else FILL)
             painter.drawPath(path)
 
-        font = QFont("Microsoft YaHei UI", 11)
+        font = QFont("Microsoft YaHei UI", 10)
         font.setWeight(QFont.Weight.DemiBold)
         painter.setFont(font)
         painter.setPen(TEXT)
@@ -168,7 +168,7 @@ class ActionWheel(QWidget):
             cx = SIZE / 2 + mid * math.cos(angle)
             cy = SIZE / 2 - mid * math.sin(angle)
             painter.drawText(
-                QRectF(cx - 44, cy - 14, 88, 28),
+                QRectF(cx - 40, cy - 13, 80, 26),
                 Qt.AlignmentFlag.AlignCenter,
                 label,
             )
