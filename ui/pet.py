@@ -17,7 +17,7 @@ import random
 import time
 
 from PyQt6.QtCore import QPoint, QSettings, Qt, QTimer
-from PyQt6.QtGui import QGuiApplication, QImage, QPainter, QPixmap, QRegion
+from PyQt6.QtGui import QCursor, QGuiApplication, QImage, QPainter, QPixmap, QRegion
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 from character.art import (
@@ -29,6 +29,7 @@ from character.art import (
     wave_frame,
 )
 from ui.chat import ChatWindow
+from ui.wheel import ActionWheel
 
 PET_SCALE = 0.55
 PET_W = round(CANVAS_W * PET_SCALE)
@@ -100,6 +101,15 @@ class KuromiPet(QWidget):
         self._drag_offset = QPoint()
 
         self._panel: ChatWindow | None = None
+        self.last_action = ""
+        self._wheel = ActionWheel()
+        self._wheel.hover_entered.connect(self._cancel_wheel_hide)
+        self._wheel.hover_left.connect(self._schedule_wheel_hide)
+        self._wheel.action_triggered.connect(self._on_wheel_action)
+        self._wheel_hide_timer = QTimer(self)
+        self._wheel_hide_timer.setSingleShot(True)
+        self._wheel_hide_timer.setInterval(420)
+        self._wheel_hide_timer.timeout.connect(self._wheel_hide_if_idle)
         self._last_interaction = time.monotonic()
         self._walking = False
         self._walk_target = QPoint()
@@ -284,6 +294,7 @@ class KuromiPet(QWidget):
             self._show_frame(self._frame(walk=index, flip=self._flip))
 
     def _stop_walk(self) -> None:
+        self._wheel.hide_wheel()
         self._walk_timer.stop()
         self._walking = False
         self._mode = "idle"
@@ -325,18 +336,47 @@ class KuromiPet(QWidget):
     def enterEvent(self, event) -> None:
         self._hover = True
         self._note_interaction()
+        self._cancel_wheel_hide()
+        if not self._walking and not self._dragging:
+            self._wheel.show_for(self.frameGeometry().center())
+            self.raise_()
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
         self._hover = False
         self._note_interaction()
+        self._schedule_wheel_hide()
         super().leaveEvent(event)
+
+    # ------------------------------------------------------------- action wheel
+
+    def _cancel_wheel_hide(self) -> None:
+        self._wheel_hide_timer.stop()
+
+    def _schedule_wheel_hide(self) -> None:
+        if self._wheel.isVisible():
+            self._wheel_hide_timer.start()
+
+    def _wheel_hide_if_idle(self) -> None:
+        if self._hover:
+            return
+        if self._wheel.isVisible():
+            local = self._wheel.mapFromGlobal(QCursor.pos())
+            if self._wheel.index_at(local.toPointF()) >= 0:
+                self._wheel_hide_timer.start()
+                return
+        self._wheel.hide_wheel()
+
+    def _on_wheel_action(self, action: str) -> None:
+        self.last_action = action
+        self._wheel.hide_wheel()
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self._note_interaction()
             self._stop_walk()
             self._dragging = True
+            self._wheel.hide_wheel()
             self._drag_offset = (
                 event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             )
@@ -352,6 +392,7 @@ class KuromiPet(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self._note_interaction()
             self._stop_walk()
+            self._wheel.hide_wheel()
             self._open_panel()
             event.accept()
 
