@@ -21,8 +21,10 @@ from PyQt6.QtGui import QCursor, QGuiApplication, QImage, QPainter, QPixmap, QRe
 from PyQt6.QtWidgets import QApplication, QMenu, QWidget
 
 from character.art import (
+    ACTION_STEPS,
     CANVAS_H,
     CANVAS_W,
+    action_frame,
     frame_counts,
     idle_frame,
     walk_frame,
@@ -36,6 +38,9 @@ PET_W = round(CANVAS_W * PET_SCALE)
 PET_H = round(CANVAS_H * PET_SCALE)
 DEVICE_DPR = 2
 TICK_MS = 90
+ACTION_DURATIONS = {"吃饭": 4000, "喝水": 3600, "睡觉": 6000}
+ACTION_KEYS = {"吃饭": "eat", "喝水": "drink", "睡觉": "sleep"}
+ACTION_FRAME_TICKS = 2
 IDLE_TICKS_PER_FRAME = 2
 BLINK_TICKS = 2
 ALPHA_CUTOFF = 25
@@ -119,6 +124,11 @@ class KuromiPet(QWidget):
         self._walk_phase = 0.0
         self._walk_frame = -1
         self._flip = False
+        self._action: str | None = None
+        self._action_key: str | None = None
+        self._action_until = 0
+        self._action_index = 0
+        self._action_tick = 0
         self._walk_timer = QTimer(self)
         self._walk_timer.timeout.connect(self._walk_step)
 
@@ -138,8 +148,12 @@ class KuromiPet(QWidget):
         wave: int | None = None,
         flip=False,
         walk: int | None = None,
+        action: str | None = None,
+        action_index: int = 0,
     ):
-        if walk is not None:
+        if action is not None:
+            key = ("action", action, action_index, flip)
+        elif walk is not None:
             key = ("walk", walk, flip)
         elif wave is not None:
             key = ("wave", wave, flip)
@@ -149,7 +163,10 @@ class KuromiPet(QWidget):
         if cached is not None:
             return cached
 
-        if walk is not None:
+        if action is not None:
+            big = action_frame(action, action_index, scale=PET_SCALE * DEVICE_DPR)
+            small = action_frame(action, action_index, scale=PET_SCALE)
+        elif walk is not None:
             big = walk_frame(walk, scale=PET_SCALE * DEVICE_DPR)
             small = walk_frame(walk, scale=PET_SCALE)
         elif wave is not None:
@@ -180,6 +197,9 @@ class KuromiPet(QWidget):
         self._maybe_wander()
         if self._walking:
             return
+        if self._action is not None:
+            self._tick_action()
+            return
         if self._ticks < self._wave_until:
             if self._mode != "wave":
                 self._mode = "wave"
@@ -194,7 +214,7 @@ class KuromiPet(QWidget):
         self._tick_idle()
 
     def _maybe_wander(self) -> None:
-        if self._walking or self._hover or self._dragging:
+        if self._walking or self._hover or self._dragging or self._action:
             return
         if self._panel is not None and self._panel.isVisible():
             return
@@ -299,6 +319,11 @@ class KuromiPet(QWidget):
         self._walking = False
         self._mode = "idle"
         self._flip = False
+        self._action: str | None = None
+        self._action_key: str | None = None
+        self._action_until = 0
+        self._action_index = 0
+        self._action_tick = 0
         self._show_frame(self._frame(blink=False, flip=False))
         self._clamp_to_screen()
         self._settings.setValue("pos", self.frameGeometry().topLeft())
@@ -306,6 +331,37 @@ class KuromiPet(QWidget):
 
     def _note_interaction(self) -> None:
         self._last_interaction = time.monotonic()
+
+    def _tick_action(self) -> None:
+        if self._ticks >= self._action_until:
+            self._action = None
+            self._action_key = None
+            self._mode = "idle"
+            self._show_frame(self._frame(blink=False, flip=self._flip))
+            return
+        self._action_tick += 1
+        if self._action_tick % ACTION_FRAME_TICKS == 0:
+            self._action_index = (self._action_index + 1) % ACTION_STEPS
+        self._show_frame(
+            self._frame(
+                action=self._action_key,
+                action_index=self._action_index,
+                flip=self._flip,
+            )
+        )
+
+    def _start_action(self, action: str) -> None:
+        self._action = action
+        self._action_key = ACTION_KEYS.get(action)
+        self._action_until = self._ticks + round(
+            ACTION_DURATIONS.get(action, 4000) / TICK_MS
+        )
+        self._action_index = 0
+        self._action_tick = 0
+        self._note_interaction()
+        self._show_frame(
+            self._frame(action=self._action_key, action_index=0, flip=self._flip)
+        )
 
     def _tick_idle(self) -> None:
         if self._blink_left > 0:
@@ -372,8 +428,12 @@ class KuromiPet(QWidget):
         self._wheel.hide_wheel()
         if action == "挥手":
             self._start_wave()
+        elif action in ACTION_DURATIONS:
+            self._start_action(action)
 
     def _start_wave(self) -> None:
+        self._action = None
+        self._action_key = None
         self._wave_until = self._ticks + round(3000 / TICK_MS)
         self._note_interaction()
 

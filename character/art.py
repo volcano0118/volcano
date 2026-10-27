@@ -9,7 +9,15 @@ from __future__ import annotations
 import math
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QColor, QImage, QPainter, QPainterPath, QPainterPathStroker, QPen
+from PyQt6.QtGui import (
+    QColor,
+    QFont,
+    QImage,
+    QPainter,
+    QPainterPath,
+    QPainterPathStroker,
+    QPen,
+)
 
 CANVAS_W, CANVAS_H = 200, 250
 
@@ -152,7 +160,7 @@ def _ear(tip, base_in, base_out, bend):
     return path
 
 
-def _draw_head(p, blink):
+def _draw_head(p, blink, mouth_open=0.0):
     ears = [
         _ear((30, 14), (84, 44), (42, 72), (44, 24, 34, 60)),
         _ear((170, 14), (116, 44), (158, 72), (156, 24, 166, 60)),
@@ -185,7 +193,7 @@ def _draw_head(p, blink):
     _draw_skull(p)
     _draw_eyes(p, blink)
     _draw_nose(p)
-    _draw_mouth(p)
+    _draw_mouth(p, mouth_open)
 
 
 def _draw_skull(p):
@@ -248,13 +256,79 @@ def _draw_nose(p):
     _fill(p, nose, SKULL, INK, 1.5)
 
 
-def _draw_mouth(p):
+def _draw_mouth(p, open_amount=0.0):
+    if open_amount > 0.12:
+        height = 4.0 + 6.0 * min(1.0, open_amount)
+        mouth = QPainterPath()
+        mouth.addEllipse(QRectF(94.5, 149.5, 11, height))
+        _fill(p, mouth, QColor("#e8748f"), INK, 1.5)
+        return
     mouth = QPainterPath(QPointF(92, 151))
     mouth.cubicTo(QPointF(96, 158), QPointF(104, 158), QPointF(108, 151))
     p.strokePath(mouth, _pen(INK, 2.0))
 
 
-def render(dy=0, blink=False, wave=None, scale=1.0, walk=None):
+def _draw_bowl(p, phase):
+    lift = 12.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase))
+    top = 180.0 - lift
+
+    bowl = QPainterPath(QPointF(76, top))
+    bowl.quadTo(QPointF(78, top + 20), QPointF(100, top + 20))
+    bowl.quadTo(QPointF(122, top + 20), QPointF(124, top))
+    bowl.closeSubpath()
+    _fill(p, bowl, QColor(252, 232, 240), INK, 2.0)
+
+    rice = QPainterPath()
+    rice.moveTo(82, top - 2)
+    rice.quadTo(QPointF(100, top - 18), QPointF(118, top - 2))
+    rice.closeSubpath()
+    _fill(p, rice, WHITE, INK, 1.5)
+
+    rim = QPainterPath()
+    rim.addEllipse(QRectF(74, top - 5, 52, 11))
+    _fill(p, rim, PINK, INK, 1.8)
+
+
+def _draw_cup(p, phase):
+    lift = 10.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase))
+    cx = 100.0
+    top = 170.0 - lift
+
+    glass = QPainterPath()
+    glass.addRoundedRect(QRectF(cx - 10, top - 18, 20, 30), 5, 5)
+
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(255, 255, 255, 205))
+    p.drawPath(glass)
+
+    p.save()
+    p.setClipPath(glass)
+    level = 17.0 * (1.0 - 0.55 * phase)
+    p.fillRect(
+        QRectF(cx - 10, top + 12 - level, 20, level),
+        QColor(140, 200, 232, 235),
+    )
+    p.restore()
+
+    p.setPen(_pen(INK, 2.0))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawPath(glass)
+
+
+def _draw_zzz(p, phase):
+    for index in range(3):
+        t = (phase + index / 3.0) % 1.0
+        alpha = int(210 * (1.0 - t))
+        if alpha <= 6:
+            continue
+        font = QFont("Segoe UI", int(8 + 7 * t))
+        font.setBold(True)
+        p.setFont(font)
+        p.setPen(QColor(74, 66, 82, alpha))
+        p.drawText(QPointF(166 + 20 * t, 100 - 46 * t), "z")
+
+
+def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phase=0.0):
     img = QImage(
         max(1, round(CANVAS_W * scale)),
         max(1, round(CANVAS_H * scale)),
@@ -265,14 +339,24 @@ def render(dy=0, blink=False, wave=None, scale=1.0, walk=None):
     p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     p.scale(scale, scale)
     bob = 0.0
+    mouth_open = 0.0
     if walk is not None:
         bob = 1.6 * (1 - math.cos(4 * math.pi * walk)) / 2
+    if action == "eat":
+        chew = max(0.0, math.sin(2 * math.pi * phase))
+        mouth_open = chew
+        bob = 2.2 * chew
+    elif action == "drink":
+        mouth_open = 0.45 + 0.45 * math.sin(2 * math.pi * phase)
+    elif action == "sleep":
+        blink = True
+        bob = 0.7 * (1 - math.cos(2 * math.pi * phase))
     p.translate(0, dy - bob)
 
     _draw_tail(p)
     _draw_body(p, walk)
     _draw_collar(p)
-    _draw_head(p, blink)
+    _draw_head(p, blink, mouth_open)
     swing = 0.0 if walk is None else math.sin(2 * math.pi * walk) * 3.5
     _draw_arm(
         p, (67, 174), (60 + swing, 185), (61 + swing * 1.6, 196),
@@ -285,6 +369,13 @@ def render(dy=0, blink=False, wave=None, scale=1.0, walk=None):
         )
     else:
         _wave_arm(p, wave / WAVE_STEPS)
+
+    if action == "eat":
+        _draw_bowl(p, phase)
+    elif action == "drink":
+        _draw_cup(p, phase)
+    elif action == "sleep":
+        _draw_zzz(p, phase)
     p.end()
     return img
 
@@ -300,6 +391,15 @@ def wave_frame(i, scale=1.0):
 def walk_frame(i, scale=1.0):
     steps = 8
     return render(0, False, None, scale, walk=(i % steps) / steps)
+
+
+ACTION_STEPS = 8
+
+
+def action_frame(name, i, scale=1.0):
+    return render(
+        0, False, None, scale, action=name, phase=(i % ACTION_STEPS) / ACTION_STEPS
+    )
 
 
 def frame_counts():
