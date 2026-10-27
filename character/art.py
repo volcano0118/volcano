@@ -321,11 +321,11 @@ def _draw_zzz(p, phase):
         alpha = int(210 * (1.0 - t))
         if alpha <= 6:
             continue
-        font = QFont("Segoe UI", int(11 + 9 * t))
+        font = QFont("Segoe UI", int(14 + 12 * t))
         font.setBold(True)
         p.setFont(font)
         p.setPen(QColor(74, 66, 82, alpha))
-        p.drawText(QPointF(162 + 24 * t, 102 - 54 * t), "Z")
+        p.drawText(QPointF(156 + 28 * t, 104 - 60 * t), "Z")
 
 
 def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phase=0.0):
@@ -343,9 +343,8 @@ def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phas
     if walk is not None:
         bob = 1.6 * (1 - math.cos(4 * math.pi * walk)) / 2
     if action == "eat":
-        chew = max(0.0, math.sin(2 * math.pi * phase))
-        mouth_open = chew
-        bob = 2.2 * chew
+        mouth_open = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
+        bob = 1.2 * max(0.0, math.sin(2 * math.pi * phase))
     elif action == "drink":
         mouth_open = 0.45 + 0.45 * math.sin(2 * math.pi * phase)
     elif action == "sleep":
@@ -363,19 +362,30 @@ def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phas
         _draw_cup(p, phase)
 
     swing = 0.0 if walk is None else math.sin(2 * math.pi * walk) * 3.5
-    if action in ("eat", "drink"):
-        if action == "eat":
-            paw_y = 180.0 - 12.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase)) - 2
-            left_paw, right_paw = (77, paw_y), (123, paw_y)
-        else:
-            paw_y = 170.0 - 10.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase)) - 1
-            left_paw, right_paw = (87, paw_y), (113, paw_y)
+    if action == "eat":
+        bowl_top = 180.0 - 12.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase))
         _draw_arm(
-            p, (67, 176), (63, paw_y + 8), left_paw,
+            p, (67, 176), (63, bowl_top + 8), (77, bowl_top - 2),
+            width=11.0, hand_size=7.0,
+        )
+        up = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
+        rice_x = 122.0 - 16.0 * up
+        rice_y = (bowl_top - 4.0) + (154.0 - bowl_top) * up
+        _draw_arm(
+            p, (133, 176), (137, rice_y + 10), (rice_x, rice_y),
+            width=11.0, hand_size=7.0,
+        )
+        bite = QPainterPath()
+        bite.addEllipse(QRectF(rice_x - 5.5, rice_y - 9.0, 11, 9.5))
+        _fill(p, bite, WHITE, INK, 1.4)
+    elif action == "drink":
+        paw_y = 170.0 - 10.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase)) - 1
+        _draw_arm(
+            p, (67, 176), (63, paw_y + 8), (87, paw_y),
             width=11.0, hand_size=7.0,
         )
         _draw_arm(
-            p, (133, 176), (137, paw_y + 8), right_paw,
+            p, (133, 176), (137, paw_y + 8), (113, paw_y),
             width=11.0, hand_size=7.0,
         )
     else:
