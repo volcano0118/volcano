@@ -321,11 +321,11 @@ def _draw_zzz(p, phase):
         alpha = int(210 * (1.0 - t))
         if alpha <= 6:
             continue
-        font = QFont("Segoe UI", int(8 + 7 * t))
+        font = QFont("Segoe UI", int(11 + 9 * t))
         font.setBold(True)
         p.setFont(font)
         p.setPen(QColor(74, 66, 82, alpha))
-        p.drawText(QPointF(166 + 20 * t, 100 - 46 * t), "z")
+        p.drawText(QPointF(162 + 24 * t, 102 - 54 * t), "Z")
 
 
 def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phase=0.0):
@@ -357,24 +357,41 @@ def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phas
     _draw_body(p, walk)
     _draw_collar(p)
     _draw_head(p, blink, mouth_open)
-    swing = 0.0 if walk is None else math.sin(2 * math.pi * walk) * 3.5
-    _draw_arm(
-        p, (67, 174), (60 + swing, 185), (61 + swing * 1.6, 196),
-        width=12.0, hand_size=8.0,
-    )
-    if wave is None:
-        _draw_arm(
-            p, (133, 174), (140 - swing, 185), (139 - swing * 1.6, 196),
-            width=12.0, hand_size=8.0,
-        )
-    else:
-        _wave_arm(p, wave / WAVE_STEPS)
-
     if action == "eat":
         _draw_bowl(p, phase)
     elif action == "drink":
         _draw_cup(p, phase)
-    elif action == "sleep":
+
+    swing = 0.0 if walk is None else math.sin(2 * math.pi * walk) * 3.5
+    if action in ("eat", "drink"):
+        if action == "eat":
+            paw_y = 180.0 - 12.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase)) - 2
+            left_paw, right_paw = (77, paw_y), (123, paw_y)
+        else:
+            paw_y = 170.0 - 10.0 * (0.5 - 0.5 * math.cos(2 * math.pi * phase)) - 1
+            left_paw, right_paw = (87, paw_y), (113, paw_y)
+        _draw_arm(
+            p, (67, 176), (63, paw_y + 8), left_paw,
+            width=11.0, hand_size=7.0,
+        )
+        _draw_arm(
+            p, (133, 176), (137, paw_y + 8), right_paw,
+            width=11.0, hand_size=7.0,
+        )
+    else:
+        _draw_arm(
+            p, (67, 174), (60 + swing, 185), (61 + swing * 1.6, 196),
+            width=12.0, hand_size=8.0,
+        )
+        if wave is None:
+            _draw_arm(
+                p, (133, 174), (140 - swing, 185), (139 - swing * 1.6, 196),
+                width=12.0, hand_size=8.0,
+            )
+        else:
+            _wave_arm(p, wave / WAVE_STEPS)
+
+    if action == "sleep":
         _draw_zzz(p, phase)
     p.end()
     return img
