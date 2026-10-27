@@ -321,11 +321,11 @@ def _draw_zzz(p, phase):
         alpha = int(210 * (1.0 - t))
         if alpha <= 6:
             continue
-        font = QFont("Segoe UI", int(14 + 12 * t))
+        font = QFont("Segoe UI", int(18 + 14 * t))
         font.setBold(True)
         p.setFont(font)
         p.setPen(QColor(74, 66, 82, alpha))
-        p.drawText(QPointF(156 + 28 * t, 104 - 60 * t), "Z")
+        p.drawText(QPointF(148 + 26 * t, 108 - 66 * t), "Z")
 
 
 def render(dy=0, blink=False, wave=None, scale=1.0, walk=None, action=None, phase=0.0):
