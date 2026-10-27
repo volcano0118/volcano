@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from PyQt6.QtCore import QThread, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -31,6 +32,7 @@ from ui.config import (
     DEEPSEEK_BASE_URL,
     DEEPSEEK_MODEL,
     SYSTEM_PROMPT,
+    resource_path,
     user_data_path,
 )
 
@@ -38,7 +40,6 @@ HISTORY_FILE = user_data_path("chat_history.json")
 
 QSS = """
 QWidget {
-    background: #fdfbff;
     color: #2a242f;
     font-family: "Microsoft YaHei UI", "Segoe UI";
     font-size: 13px;
@@ -47,7 +48,7 @@ QLabel#header {
     font-size: 16px;
     font-weight: 600;
     padding: 10px 16px;
-    background: #f7accc;
+    background: rgba(247, 172, 204, 0.92);
     color: #2a242f;
 }
 QLabel#section {
@@ -63,7 +64,7 @@ QLabel#hint {
 }
 QListWidget {
     border: none;
-    background: #f7f3f9;
+    background: rgba(255, 255, 255, 0.45);
     outline: 0;
     padding: 4px;
 }
@@ -80,16 +81,16 @@ QListWidget::item:selected {
     color: #2a242f;
 }
 QTextBrowser {
-    border: 1px solid #efe9f2;
+    border: 1px solid rgba(255, 255, 255, 0.65);
     border-radius: 10px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.82);
     padding: 6px;
 }
 QLineEdit {
-    border: 1px solid #e3dce8;
+    border: 1px solid rgba(255, 255, 255, 0.9);
     border-radius: 16px;
     padding: 8px 14px;
-    background: #ffffff;
+    background: rgba(255, 255, 255, 0.9);
 }
 QLineEdit:focus {
     border-color: #f7accc;
@@ -216,6 +217,7 @@ class ChatWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_QuitOnClose, False)
         self.setStyleSheet(QSS)
 
+        self._background = self._load_background()
         self.store = ChatStore(HISTORY_FILE)
         self.current: dict | None = None
         self._worker: ChatWorker | None = None
@@ -288,6 +290,31 @@ class ChatWindow(QWidget):
 
         self._load_initial()
         self.input.setFocus()
+
+    @staticmethod
+    def _load_background() -> QPixmap | None:
+        path = resource_path("chat_bg.png")
+        if not path.exists():
+            return None
+        pixmap = QPixmap(str(path))
+        return None if pixmap.isNull() else pixmap
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        if self._background is None:
+            painter.fillRect(self.rect(), QColor("#fdfbff"))
+            return
+        scaled = self._background.scaled(
+            self.size(),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        painter.drawPixmap(
+            (self.width() - scaled.width()) // 2,
+            (self.height() - scaled.height()) // 2,
+            scaled,
+        )
+        painter.fillRect(self.rect(), QColor(255, 255, 255, 110))
 
     # -------------------------------------------------------------- sessions
 
