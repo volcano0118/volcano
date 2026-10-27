@@ -96,7 +96,7 @@ class KuromiPet(QWidget):
         self._blink_left = 0
         self._next_blink = random.randint(30, 70)
         self._hover = False
-        self._greet_until = 16
+        self._wave_until = 16
         self._dragging = False
         self._drag_offset = QPoint()
 
@@ -180,7 +180,7 @@ class KuromiPet(QWidget):
         self._maybe_wander()
         if self._walking:
             return
-        if self._hover or self._ticks < self._greet_until:
+        if self._ticks < self._wave_until:
             if self._mode != "wave":
                 self._mode = "wave"
                 self._wave_index = 0
@@ -370,6 +370,12 @@ class KuromiPet(QWidget):
     def _on_wheel_action(self, action: str) -> None:
         self.last_action = action
         self._wheel.hide_wheel()
+        if action == "挥手":
+            self._start_wave()
+
+    def _start_wave(self) -> None:
+        self._wave_until = self._ticks + round(3000 / TICK_MS)
+        self._note_interaction()
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -424,7 +430,7 @@ class KuromiPet(QWidget):
         )
         chosen = menu.exec(event.globalPos())
         if chosen is wave_action:
-            self._greet_until = self._ticks + 4 * self._wave_count
+            self._start_wave()
         elif chosen is corner_action:
             self._move_to_corner()
         elif chosen is quit_action:
